@@ -7,7 +7,7 @@ import express from "express";
 // const express = require("express");
 // const https = require("https");
 import https from "https";
-
+import http from "http"
 import cors from "cors"
 import { v4 } from "uuid";
 
@@ -51,79 +51,90 @@ const SCHEMA = ['name','email','password']
 
 // Basic web server configurations
 let options: Options;
-if (process.env.NODE_ENV === "DEV") {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+// if (process.env.NODE_ENV === "DEV") {
+//     process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 
-    // development certificate
-    options = {
-        key: fs.readFileSync('C:\\Users\\marac\\code\\hackathon-quhacks\\key.pem'),
-        cert: fs.readFileSync('C:\\Users\\marac\\code\\hackathon-quhacks\\cert.pem'),
-        // Remove this line once done with production
-        rejectUnauthorized: false
-    };    
-    // Local host
-    app.use(cors({
-        origin: "http://localhost:5173",
-        methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-        credentials: true
-    }));
+//     // development certificate
+//     options = {
+//         key: fs.readFileSync('C:\\Users\\marac\\code\\hackathon-quhacks\\key.pem'),
+//         cert: fs.readFileSync('C:\\Users\\marac\\code\\hackathon-quhacks\\cert.pem'),
+//         // Remove this line once done with production
+//         rejectUnauthorized: false
+//     };    
+//     // Local host
+//     app.use(cors({
+//         origin: "http://localhost:5173",
+//         methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+//         credentials: true
+//     }));
     
-} else {
+// } else {
 
-    // STEP 1: This will be where the certificates are stored.
+//     // STEP 1: This will be where the certificates are stored.
 
-    options = {
-        key: fs.readFileSync('C:\\Program Files\\Git\\usr\\bin\\key.pem'),
-        cert: fs.readFileSync('C:\\Program Files\\Git\\usr\\bin\\certificate.pem'),
-        // Remove this line once done with production
-        rejectUnauthorized: false
-    };    
+//     options = {
+//         key: fs.readFileSync('C:\\Program Files\\Git\\usr\\bin\\key.pem'),
+//         cert: fs.readFileSync('C:\\Program Files\\Git\\usr\\bin\\certificate.pem'),
+//         // Remove this line once done with production
+//         rejectUnauthorized: false
+//     };    
 
-    app.use(cors({
-        origin: process.env.PROD_URL,
-        methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-        credentials: true
-    }));
-    // prod credentials
+//     app.use(cors({
+//         origin: process.env.PROD_URL,
+//         methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+//         credentials: true
+//     }));
+//     // prod credentials
 
 
-}
+// }
 
 
 // Setting up cookies
-app.use(session({
-    secret: process.env.COOKIE_SECRET as string,
-    cookie: {
-        path: "/",
-        maxAge: 2628000000,
-        httpOnly: true,     
-        sameSite: "none",
-        secure: true,
-    },
-    resave: false,
-    saveUninitialized: true,
-    store: new MemoryStore({
-        checkPeriod: 86400000 
-    }) as any, 
-}));
+// app.use(session({
+//     secret: process.env.COOKIE_SECRET as string,
+//     cookie: {
+//         path: "/",
+//         maxAge: 2628000000,
+//         httpOnly: true,     
+//         sameSite: "none",
+//         secure: true,
+//     },
+//     resave: false,
+//     saveUninitialized: true,
+//     store: new MemoryStore({
+//         checkPeriod: 86400000 
+//     }) as any, 
+// }));
 
 // Setting up body parser
 app.use(bodyParser.json({limit: "10mb"}))
 
 
+// Middleware to process tokens
 
-
-
-const server = https.createServer(options, app)
-
+// app.use(function(req: Request, res: Response, next: NextFunction) {
 
 
 
 
 
 
+// })
 
-app.get("/", (req: Request,res: Response) => {
+
+
+
+// const server = https.createServer(options, app)
+const server = http.createServer(app)
+
+
+
+
+
+
+
+app.get("/", (req: Request, res: Response) => {
     res.send("new year new me")
 })
 
@@ -131,7 +142,7 @@ app.get("/", (req: Request,res: Response) => {
 
 
 
-app.post('/register', async (req: Request,res: Response) => {
+app.post('/register', async (req: Request, res: Response) => {
     // These are where the checks are. 
     
 
@@ -174,7 +185,7 @@ app.post('/register', async (req: Request,res: Response) => {
                             const uuid = v4();
                             // We should encrypt the password here
                             // We should maybe add some type safety here
-                            bcrypt.hash(password, saltRounds, (err,hash) => {
+                            bcrypt.hash(password, saltRounds, async(err,hash) => {
 
                                 if (err) {
                                     reportError(err);
@@ -191,8 +202,9 @@ app.post('/register', async (req: Request,res: Response) => {
                                         ...newUser,
                                     })
                                     
-                                    setCookie(req,uuid);
-                                    res.status(200).send(craftRequest(200,uuid));
+                                    const token = await setCookie(uuid);
+                                    console.log("token", token)
+                                    res.status(200).send(craftRequest(200,{token: token}));
                                 }
 
                             })
@@ -232,7 +244,7 @@ app.post("/login", (req,res) => {
                             
 
 
-                            bcrypt.compare(password, user.password, (err: any,result: boolean) => {
+                            bcrypt.compare(password, user.password,async (err: any,result: boolean) => {
                                 if (err) {
                                     console.log(err);
                                     res.status(400).send(craftRequest(400));
@@ -240,8 +252,8 @@ app.post("/login", (req,res) => {
 
                                     
                                     if (result) {
-                                        setCookie(req, user.uuid);
-                                        res.status(200).send(craftRequest(200));
+                                        const token = await setCookie(req, user.uuid);
+                                        res.status(200).send(craftRequest(200,{token: token}));
                                     } else {
                                         res.status(400).send(craftRequest(400));
                                     }
@@ -309,216 +321,259 @@ app.get("/getUser", (req,res) => {
 
 })
 
-app.post("/changeSettings", (req,res) => {
 
-    try {
 
-        // const {...x} = req.body;
-        // console.log("req",req.body);
+
+
+
+app.post("/reportError", (req,res) => {
+    try {   
+        const {latitude, longitude, type} = req.body;
         authenticateUser(req).then((id: string) => {
-
+            console.log("id", id)
             if (id === "No user found") {
-    
                 res.status(403).send(craftRequest(403))
             } else {
-                
-                locateEntry("uuid", id).then((user: LocateEntryEntry) => {
-                    if (user !== ""&&!Array.isArray(user)) {
-                        
+                console.log("got here")
+               locateEntry("uuid", id).then((thing: LocateEntryEntry) => {
 
-                        const changedUser: any = {}
-                        console.log(Object.keys(user))
+                console.log(thing)
+                console.log("too much aura.")
+                const email = `New Error... \n\nLatitude: ${latitude} \n\nLongitude: ${longitude} \n\nType: ${type}`
 
-                        Object.keys(user).map((key) => {
-                            console.log("ajdsf", key)
-                            if ((key !== "email") && (key !== "emailHash") && (key !== "password")) {
-                                if (Object.keys(req.body).includes(key.toLowerCase())) {
-                                    changedUser[key] = req.body[key];
-                                }
-                            }
-                        })  
+                sendEmail(process.env.EMAIL_PERSONAL, "Error Message for parking app", email)
+                res.status(200).send(craftRequest(200))
 
 
-                        console.log("changed user", changedUser)
-                        updateEntry("uuid", user?.uuid, changedUser).then((a) => {
-                            console.log("a", a);
-                            res.status(200).send(craftRequest(200));
-                        })
-                        return;
-                        // do something here
-                    } else {
-                        res.status(400).send(craftRequest(400));
-                    }
-    
-                    
-                })
-    
-    
-    
-    
-    
+               })
             }
-    
-    
-    
         })
 
 
+
+
     } catch(e) {
-
-
-        console.log(e)
-        reportError(e);
-        res.status(400).send(craftRequest(400));
-        return;
-
+        console.log(e);
     }
-   
+
+
 
 
 })
+
+
+
+
+// app.post("/changeSettings", (req,res) => {
+
+//     try {
+
+//         // const {...x} = req.body;
+//         // console.log("req",req.body);
+//         authenticateUser(req).then((id: string) => {
+
+//             if (id === "No user found") {
+    
+//                 res.status(403).send(craftRequest(403))
+//             } else {
+                
+//                 locateEntry("uuid", id).then((user: LocateEntryEntry) => {
+//                     if (user !== ""&&!Array.isArray(user)) {
+                        
+
+//                         const changedUser: any = {}
+//                         console.log(Object.keys(user))
+
+//                         Object.keys(user).map((key) => {
+//                             console.log("ajdsf", key)
+//                             if ((key !== "email") && (key !== "emailHash") && (key !== "password")) {
+//                                 if (Object.keys(req.body).includes(key.toLowerCase())) {
+//                                     changedUser[key] = req.body[key];
+//                                 }
+//                             }
+//                         })  
+
+
+//                         console.log("changed user", changedUser)
+//                         updateEntry("uuid", user?.uuid, changedUser).then((a) => {
+//                             console.log("a", a);
+//                             res.status(200).send(craftRequest(200));
+//                         })
+//                         return;
+//                         // do something here
+//                     } else {
+//                         res.status(400).send(craftRequest(400));
+//                     }
+    
+                    
+//                 })
+    
+    
+    
+    
+    
+//             }
+    
+    
+    
+//         })
+
+
+//     } catch(e) {
+
+
+//         console.log(e)
+//         reportError(e);
+//         res.status(400).send(craftRequest(400));
+//         return;
+
+//     }
+   
+
+
+// })
 
 
 
 // This won't work
-app.post("/sendCode", (req,res) => {
-    try {
+// app.post("/sendCode", (req,res) => {
+//     try {
 
-        const {email}: CodeBody = req.body;
+//         const {email}: CodeBody = req.body;
         
 
-        if (isEmail(email)) {
-            locateEntry("emailHash", md5(email.trim())).then((users: LocateEntryEntry) => {
-                // console.log("this is the",user)
-                if (users !== ""&&Array.isArray(users)) {
-                    // console.log(user);
-                    const user = users[0]
-                    const code = generateCode(6)
+//         if (isEmail(email)) {
+//             locateEntry("emailHash", md5(email.trim())).then((users: LocateEntryEntry) => {
+//                 // console.log("this is the",user)
+//                 if (users !== ""&&Array.isArray(users)) {
+//                     // console.log(user);
+//                     const user = users[0]
+//                     const code = generateCode(6)
 
-                    const text = `Hello,
+//                     const text = `Hello,
 
-You have asked to reset your password. If this wasn't you, ignore this email.
+// You have asked to reset your password. If this wasn't you, ignore this email.
 
-Your code is: ${code}`
+// Your code is: ${code}`
 
-                    // bookmark
-                    console.log(user)
-                    updateEntry("uuid", user.uuid, {passwordCode: code}).then((response: boolean) => {
-                        if (response) {
-                            sendEmail(email.trim(), `Reset Password - ${process.env.COMPANY_NAME}`,text).then((alert: boolean) => {
-                                if (alert) {
-                                    res.status(200).send(craftRequest(200));
-                                } else {
-                                    res.status(400).send(craftRequest(400));
-                                }
+//                     // bookmark
+//                     console.log(user)
+//                     updateEntry("uuid", user.uuid, {passwordCode: code}).then((response: boolean) => {
+//                         if (response) {
+//                             sendEmail(email.trim(), `Reset Password - ${process.env.COMPANY_NAME}`,text).then((alert: boolean) => {
+//                                 if (alert) {
+//                                     res.status(200).send(craftRequest(200));
+//                                 } else {
+//                                     res.status(400).send(craftRequest(400));
+//                                 }
                             
-                            })
-                        } else {
-                            res.status(400).send(craftRequest(400));
-                        }
-                    })
+//                             })
+//                         } else {
+//                             res.status(400).send(craftRequest(400));
+//                         }
+//                     })
                     
 
 
-                } else {
-                    res.status(400).send(craftRequest(400));
-                }
-            })
+//                 } else {
+//                     res.status(400).send(craftRequest(400));
+//                 }
+//             })
 
 
-        } else {
-            res.status(400).send(craftRequest(400));
-        }
-
-
-
-
-    } catch(e) {
-        console.log(e);
-        reportError(e);
-        res.status(400).send(craftRequest(400));
-    }
-})
+//         } else {
+//             res.status(400).send(craftRequest(400));
+//         }
 
 
 
 
-app.post("/changePassword", (req,res) => {
-    try {
-        const {code, password, email} = req.body;
-
-        console.log(isPassword(password))
-        console.log(isNumber(code))
-
-        if (isPassword(password) && isNumber(code)) {
+//     } catch(e) {
+//         console.log(e);
+//         reportError(e);
+//         res.status(400).send(craftRequest(400));
+//     }
+// })
 
 
-            const emailHash = md5(email);
+
+
+// app.post("/changePassword", (req,res) => {
+//     try {
+//         const {code, password, email} = req.body;
+
+//         console.log(isPassword(password))
+//         console.log(isNumber(code))
+
+//         if (isPassword(password) && isNumber(code)) {
+
+
+//             const emailHash = md5(email);
 
             
 
-            locateEntry("emailHash", emailHash).then((users: LocateEntryEntry) => {
-                if (Array.isArray(users)&&users.length>0) {
-                    const user = users[0];
+//             locateEntry("emailHash", emailHash).then((users: LocateEntryEntry) => {
+//                 if (Array.isArray(users)&&users.length>0) {
+//                     const user = users[0];
 
-                    locateEntry("uuid", user.uuid).then((user: LocateEntryEntry) => {
-                        if (!Array.isArray(user)&&user !== "") {
+//                     locateEntry("uuid", user.uuid).then((user: LocateEntryEntry) => {
+//                         if (!Array.isArray(user)&&user !== "") {
 
-                            if (String(user.passwordCode) === String(code)) {
+//                             if (String(user.passwordCode) === String(code)) {
 
 
-                                if (isPassword(password)) {
+//                                 if (isPassword(password)) {
                                     
                                     
-                                    bcrypt.hash(password, saltRounds, function(err: any, hash: string) {
-                                    // Store hash in your password DB.
+//                                     bcrypt.hash(password, saltRounds, function(err: any, hash: string) {
+//                                     // Store hash in your password DB.
 
-                                        if (err) {
-                                            reportError(err);
-                                            res.status(400).send(craftRequest(400))
+//                                         if (err) {
+//                                             reportError(err);
+//                                             res.status(400).send(craftRequest(400))
                                             
-                                        } else {
+//                                         } else {
                                             
-                                            updateEntry("uuid",user.uuid,{password: hash}).then((x) => {
-                                                res.status(200).send(craftRequest(200));
-                                            })
-                                        }
-                                    });
+//                                             updateEntry("uuid",user.uuid,{password: hash}).then((x) => {
+//                                                 res.status(200).send(craftRequest(200));
+//                                             })
+//                                         }
+//                                     });
                                     
 
 
-                                } else {
-                                    res.status(400).send(craftRequest(400, {status: "invalid password"}))
-                                }
+//                                 } else {
+//                                     res.status(400).send(craftRequest(400, {status: "invalid password"}))
+//                                 }
 
 
 
                             
 
 
-                            } else {
-                                res.status(400).send(craftRequest(400, {status: "invalid code"}))
-                            }
+//                             } else {
+//                                 res.status(400).send(craftRequest(400, {status: "invalid code"}))
+//                             }
 
-                        } else {
+//                         } else {
 
-                            res.status(400).send(craftRequest(400));
-
-
-                        }
-
-                    })
+//                             res.status(400).send(craftRequest(400));
 
 
+//                         }
 
-
-                } else {
+//                     })
 
 
 
-                    res.status(403).send(craftRequest(403));
-                }
-            })
+
+//                 } else {
+
+
+
+//                     res.status(403).send(craftRequest(403));
+//                 }
+//             })
 
             
 
@@ -526,19 +581,19 @@ app.post("/changePassword", (req,res) => {
 
 
 
-        } else {
-            console.log(code);
-            console.log(password);
-            console.log(email);
-            res.status(400).send(craftRequest(400));
-        }
+//         } else {
+//             console.log(code);
+//             console.log(password);
+//             console.log(email);
+//             res.status(400).send(craftRequest(400));
+//         }
 
-    } catch(e) {
-        console.log(e);
-        reportError(e);
-        res.status(400).send(craftRequest(400));
-    }
-})
+//     } catch(e) {
+//         console.log(e);
+//         reportError(e);
+//         res.status(400).send(craftRequest(400));
+//     }
+// })
 
 
 

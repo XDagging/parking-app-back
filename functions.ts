@@ -1,40 +1,74 @@
 // const nodemailer = require("nodemailer")
 import nodemailer from "nodemailer"
-import { Request, Response, NextFunction } from 'express';
+import { Request} from 'express';
+import jwt from "jsonwebtoken";
 
-
-declare module 'express-session' {
-    interface SessionData {
-        user?: string;
+// declare module 'express-session' {
+//     interface SessionData {
+//         user?: string;
+//     }
+// }
+function setCookie(uuid: string) {
+    console.log(process.env.COOKIE_SECRET)
+    return new Promise(async (resolve) => {
+    if (uuid.length>0) {
+        const newToken = await jwt.sign({uuid: uuid}, process.env.COOKIE_SECRET, {expiresIn: "7 days"})
+        const payload = await jwt.verify(newToken, process.env.COOKIE_SECRET);
+        console.log("This is what the payload looks like: ", payload);
+        resolve(newToken)
+    } else {
+        resolve("no uuid provided")
     }
+    })
 }
 
 function authenticateUser(req: Request) {
+    return new Promise(async(resolve) => {
+        // let sessionId = req.sessionID;
+        console.log(process.env.COOKIE_SECRET)
+        const token = req.headers?.authorization
+        console.log("this is the token", token);
+        // console.log("This is what a token looks like: ", token);
+        if (token) {
+            try {
+                const payload = await jwt.verify(token, process.env.COOKIE_SECRET);
+                console.log("This is what the payload looks like: ", payload);
+                resolve(payload.uuid)
+            } catch(e) {
 
-    return new Promise((resolve) => {
-        let sessionId = req.sessionID;
-
-        if (!sessionId) {
-            resolve("No user found");
+                console.log("error in verifying the token")
+                resolve("No user found");
+                console.log(e);
+                
+            }
         } else {
-            req.sessionStore.get(sessionId, (err, session: any) => {
-                if (err) {
-                    console.log(err);
-                    resolve("No user found");
-                } else {
-                    if (!session) {
-                        resolve("No user found");
-                    } else {
-                        const currentUser = session?.user;
-                        if (!currentUser) {
-                            resolve("No user found");
-                        } else {
-                            resolve(currentUser);
-                        }
-                    }
-                }
-            });
+            resolve("No user found");
         }
+
+
+
+
+        // if (!sessionId) {
+        //     resolve("No user found");
+        // } else {
+        //     req.sessionStore.get(sessionId, (err, session: any) => {
+        //         if (err) {
+        //             console.log(err);
+        //             resolve("No user found");
+        //         } else {
+        //             if (!session) {
+        //                 resolve("No user found");
+        //             } else {
+        //                 const currentUser = session?.user;
+        //                 if (!currentUser) {
+        //                     resolve("No user found");
+        //                 } else {
+        //                     resolve(currentUser);
+        //                 }
+        //             }
+        //         }
+        //     });
+        // }
     });
 }
 
@@ -206,17 +240,6 @@ function craftRequest(code: number,body: object) {
 }
 
 
-
-function setCookie(req: Request, uuid: string) {
-
-    if (req && uuid) {
-        req.session.user = uuid;
-        return true;
-    } else {
-        return false;
-    }
-   
-}
 
 
 
