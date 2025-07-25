@@ -4,7 +4,8 @@
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "npx tsx app.ts"
+    "dev": "npx tsx src/app.ts",
+    "build": "tsc"
   },
   "author": "",
   "license": "ISC",
@@ -13,13 +14,13 @@
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.767.0",
     "@aws-sdk/lib-dynamodb": "^3.767.0",
-    "bcrypt": "^5.1.1",
+    "@codegenie/serverless-express": "^4.16.0",
+    "bcryptjs": "^3.0.2",
     "body-parser": "^1.20.3",
     "cors": "^2.8.5",
     "cryptr": "^6.3.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "express-session": "^1.18.1",
     "fs": "^0.0.1-security",
     "https": "^1.0.0",
     "jsonwebtoken": "^9.0.2",
@@ -29,10 +30,11 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "@types/bcrypt": "^5.0.2",
     "@types/express": "^5.0.3",
-    "@types/express-session": "^1.18.2",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/md5": "^2.3.5",
-    "tsx": "^4.20.3"
+    "@types/nodemailer": "^6.4.17",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
   }
 }

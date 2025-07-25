@@ -6,7 +6,15 @@ npm-shrinkwrap.json
 *.gz
 
 
-
+/dist
+parking-back.zip
+functions.js
+handler.js
+types.js
+dynamodbClient.zip
+databaseFunctions.js
+dynamodbClient.js
+app.js
 .env
 # Coveralls
 .nyc_output

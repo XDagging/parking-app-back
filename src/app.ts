@@ -3,8 +3,7 @@ require('dotenv').config()
 
 const {authenticateUser, isEmail, isPassword, isString, isNumber, reportError, craftRequest, setCookie, sendEmail, generateCode} = require('./functions.js');
 
-import express from "express";
-// const express = require("express");
+const express = require("express");
 // const https = require("https");
 import https from "https";
 import http from "http"
@@ -23,23 +22,23 @@ const app = express();
 const region: string = "us-east-1"
 // const session = require("express-session");
 // @ts-ignore
-import session from "express-session"
+// import session from "express-session"
 
 import {locateEntry, addEntry, updateEntry} from "./databaseFunctions.js"
 // ...existing code...
 // Use require for memorystore if import fails
 
-const MemoryStore = require("memorystore")(session);
+// const MemoryStore = require("memorystore")(session);
 // ...existing code...
 
 // const bcrypt = require("bcrypt");
-import bcrypt from "bcrypt"
+import bcrypt from "bcryptjs"
 
 // const Cryptr = require('cryptr');
 import Cryptr from "cryptr"
 
 const saltRounds = 10;
-import type { Options, RegisterBody, User, LoginBody, CodeBody, LocateEntryEntry } from "./types.js";
+import type { Options, RegisterBody, User, LoginBody, CodeBody, LocateEntryEntry } from "./types.ts";
 if (!process.env.ENCRYPTION_KEY) {
     throw new Error("Encryption key isn't set. Add it now.");
 }
@@ -125,8 +124,8 @@ app.use(bodyParser.json({limit: "10mb"}))
 
 
 
-// const server = https.createServer(options, app)
 const server = http.createServer(app)
+
 
 
 
@@ -155,9 +154,11 @@ app.post('/register', async (req: Request, res: Response) => {
 
         if (password && email && name) {
 
-
-            if (isEmail(email) && isPassword(password) && isString(name)) {
-
+            console.log("we got here?", isEmail(email))
+            console.log("this is here", isPassword(password));
+            console.log("this happened as well", typeof name === "string");
+            if (isEmail(email) && isPassword(password) && typeof name === "string") {
+                console.log("got here")
                 // then we should check if the user exists or not
                 
                 await locateEntry("emailHash", md5(email.toLowerCase())).then((users: "" | User | User[]) => {
@@ -193,6 +194,8 @@ app.post('/register', async (req: Request, res: Response) => {
                                     res.status(404).send(craftRequest(404));
 
                                 } else {
+
+                                    if (hash) 
                                     addEntry({ 
                                         uuid: uuid,
                                         name: name,
@@ -201,6 +204,10 @@ app.post('/register', async (req: Request, res: Response) => {
                                         password: hash,
                                         ...newUser,
                                     })
+                                    else {
+                                        res.status(400).send(craftRequest);
+                                        return;
+                                    }
                                     
                                     const token = await setCookie(uuid);
                                     console.log("token", token)
@@ -220,6 +227,7 @@ app.post('/register', async (req: Request, res: Response) => {
             }
 
         } else {
+            console.log("we didnt get here")
             res.status(400).send(await craftRequest(400));
         }
     } catch(e) {
@@ -227,66 +235,47 @@ app.post('/register', async (req: Request, res: Response) => {
     }
 })
 
-app.post("/login", (req,res) => {
-
+app.post("/login", async (req: Request, res: Response) => {
     try {
+        const { email, password }: LoginBody = req.body;
 
-        const {email, password}: LoginBody = req.body;
-
-
-        if (isEmail(email) && isPassword(password)) {
-            locateEntry("emailHash", md5(email)).then((users: LocateEntryEntry) => {
-                if (Array.isArray(users) && users.length > 0) {
-                    console.log(users[0])
-                    locateEntry("uuid", users[0].uuid).then((user: LocateEntryEntry) => {
-                        // console.log(thing);
-                        if (user != null&&user!=""&&!Array.isArray(user)) {
-                            
-
-
-                            bcrypt.compare(password, user.password,async (err: any,result: boolean) => {
-                                if (err) {
-                                    console.log(err);
-                                    res.status(400).send(craftRequest(400));
-                                } else {
-
-                                    
-                                    if (result) {
-                                        const token = await setCookie(req, user.uuid);
-                                        res.status(200).send(craftRequest(200,{token: token}));
-                                    } else {
-                                        res.status(400).send(craftRequest(400));
-                                    }
-
-
-                                }
-                            })
-
-                        } else {
-                            res.status(400).send(craftRequest(400));
-                        }
-                    })
-                } else {
-                    res.status(400).send(craftRequest(400));
-                }
-            })
-        } else {
-            res.status(403).send(craftRequest(403));
+        if (!isEmail(email) || !isPassword(password)) {
+            return res.status(403).send(craftRequest(403));
         }
 
+        // emailHash lookup returns an array
+        const users = await locateEntry("emailHash", md5(email)) as User[];
 
+        if (!Array.isArray(users) || users.length === 0) {
+            return res.status(400).send(craftRequest(400));
+        }
 
-    } catch(e) {
+        // uuid lookup returns a single User
+        const user = await locateEntry("uuid", users[0].uuid) as User;
 
+        
+        if (!user || typeof user !== "object" || !user.password) {
+            return res.status(400).send(craftRequest(400));
+        }
+
+        bcrypt.compare(password, user.password, async (err, result) => {
+            if (err || !result) {
+                return res.status(400).send(craftRequest(400));
+            }
+            console.log(user)
+            console.log('this is the uuid', user.uuid)
+            const token = await setCookie(user.uuid);
+            return res.status(200).send(craftRequest(200, { token }));
+        });
+
+    } catch (e) {
         reportError(e);
         res.status(400).send(craftRequest(400));
     }
+});
 
 
-
-}) 
-
-app.get("/getUser", (req,res) => {
+app.get("/getUser", (req: Request,res: Response) => {
 
     authenticateUser(req).then((user: string) => {
         if (user === "No user found") {
@@ -326,7 +315,7 @@ app.get("/getUser", (req,res) => {
 
 
 
-app.post("/reportError", (req,res) => {
+app.post("/reportError", (req: Request,res: Response) => {
     try {   
         const {latitude, longitude, type} = req.body;
         authenticateUser(req).then((id: string) => {
@@ -605,11 +594,11 @@ app.post("/reportError", (req,res) => {
 
 
 
+export default app;
 
-
-server.listen(process.env.PORT, () => {
-    console.log("Listening on port:", process.env.PORT)
-})
+// server.listen(process.env.PORT, () => {
+//     console.log("Listening on port:", process.env.PORT)
+// })
 
 
 

@@ -8,15 +8,21 @@ import jwt from "jsonwebtoken";
 //         user?: string;
 //     }
 // }
+
+const cookieSecret = process.env.COOKIE_SECRET || null;
 function setCookie(uuid: string) {
     console.log(process.env.COOKIE_SECRET)
+
+    console.log("this is the uuid sent", uuid)
+
     return new Promise(async (resolve) => {
-    if (uuid.length>0) {
-        const newToken = await jwt.sign({uuid: uuid}, process.env.COOKIE_SECRET, {expiresIn: "7 days"})
-        const payload = await jwt.verify(newToken, process.env.COOKIE_SECRET);
+    if (uuid.length>0&&cookieSecret!=null) {
+        const newToken = await jwt.sign({uuid: uuid}, cookieSecret, {expiresIn: "7 days"})
+        const payload = await jwt.verify(newToken, cookieSecret);
         console.log("This is what the payload looks like: ", payload);
         resolve(newToken)
     } else {
+        console.log("This crashed and here's why: ", uuid)
         resolve("no uuid provided")
     }
     })
@@ -25,15 +31,19 @@ function setCookie(uuid: string) {
 function authenticateUser(req: Request) {
     return new Promise(async(resolve) => {
         // let sessionId = req.sessionID;
-        console.log(process.env.COOKIE_SECRET)
+        console.log(cookieSecret)
         const token = req.headers?.authorization
         console.log("this is the token", token);
         // console.log("This is what a token looks like: ", token);
-        if (token) {
+        if (token&&cookieSecret!=null) {
             try {
-                const payload = await jwt.verify(token, process.env.COOKIE_SECRET);
+                const payload = jwt.verify(token, cookieSecret);
                 console.log("This is what the payload looks like: ", payload);
-                resolve(payload.uuid)
+                if (typeof payload === "object" && payload !== null && "uuid" in payload) {
+                    resolve((payload as { uuid: string }).uuid);
+                } else {
+                    resolve("No user found");
+                }
             } catch(e) {
 
                 console.log("error in verifying the token")
@@ -105,7 +115,7 @@ async function sendEmail(to: string, subject: string, text: string) {
 
 
 
-async function reportError(err) {
+async function reportError(err: string) {
     if (err.length>0&&process.env.EMAIL_PERSONAL) {
         await sendEmail(process.env.EMAIL_PERSONAL, "Report Bug #", err);
         return true;
